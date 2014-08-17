@@ -8,7 +8,7 @@ go-pastel is a copy and paste sharing web application like gist written in golan
 
 ## Installation
 
-Executable binaries are available at [releases](https://github.com/sonots/go-pastel/releases).
+Executable binaries, which contains asset files, are available at [releases](https://github.com/sonots/go-pastel/releases).
 
 For example, for linux x86\_64, 
 
@@ -46,13 +46,6 @@ GLOBAL OPTIONS:
    --version, -v                print the version
 ```
 
-## ToDo
-
-1. write tests
-2. output log to file, allow to change log_level
-3. How to limit number of concurrent http requests?
-4. How to limit number of concurrent db connections? => db.SetMaxIdleConns
-
 ## Build
 
 To build, use go get and make
@@ -71,10 +64,16 @@ go get github.com/mitchellh/gox
 gox -build-toolchain # only first time
 go get github.com/tcnksm/ghr
 
-cd $GOPATH/src/github.com/sonots/go-pastel/pkg
-gox ../...
+mkdir -p pkg && cd pkg && gox --os=linux --os=windows ../...
 ghr <tag> .
 ```
+
+## ToDo
+
+1. write tests
+2. output log to file, allow to change log_level
+3. How to limit number of concurrent http requests?
+4. How to limit number of concurrent db connections? => db.SetMaxIdleConns
 
 ## Contribution
 
