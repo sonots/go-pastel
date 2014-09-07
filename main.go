@@ -9,6 +9,7 @@ import (
 	"github.com/elazarl/go-bindata-assetfs"
 	_ "github.com/mattn/go-sqlite3"
 	"html/template"
+	"io"
 	"log"
 	"math/rand"
 	"net/http"
@@ -29,6 +30,17 @@ type MemoDecorator struct {
 var formTmpl = template.Must(template.New("form").Parse(AssetFiles("views/base.html", "views/form.html")))
 var memoTmpl = template.Must(template.New("memo").Parse(AssetFiles("views/base.html", "views/memo.html")))
 var db *sql.DB
+
+type PageCache struct {
+	page   string
+	expire int64
+}
+
+var M = struct {
+	pageCache map[string]PageCache
+}{
+	pageCache: make(map[string]PageCache),
+}
 
 func AssetFiles(filenames ...string) string {
 	var buffer bytes.Buffer
@@ -118,20 +130,28 @@ func memoHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		http.Redirect(w, r, "/", http.StatusFound)
 	} else if r.Method == "GET" {
-		var memo MemoDecorator
-		var createdAt int64
-		query := "SELECT body, created_at FROM memos WHERE access_key = ?"
-		err := db.QueryRow(query, key).Scan(&memo.Body, &createdAt)
-		switch {
-		case err == sql.ErrNoRows:
-			http.NotFound(w, r)
-			return
-		case err != nil:
-			log.Fatal(err)
-		}
-		memo.CreatedAt = time.Unix(createdAt, 0).Format("2006/01/02 15:04")
+		cache := M.pageCache[key]
+		if cache.expire == 0 || cache.expire < time.Now().UnixNano() {
+			var memo MemoDecorator
+			var createdAt int64
+			query := "SELECT body, created_at FROM memos WHERE access_key = ?"
+			err := db.QueryRow(query, key).Scan(&memo.Body, &createdAt)
+			switch {
+			case err == sql.ErrNoRows:
+				http.NotFound(w, r)
+				return
+			case err != nil:
+				log.Fatal(err)
+			}
+			memo.CreatedAt = time.Unix(createdAt, 0).Format("2006/01/02 15:04")
 
-		memoTmpl.ExecuteTemplate(w, "base", memo)
+			buf := bytes.Buffer{}
+			memoTmpl.ExecuteTemplate(&buf, "base", memo)
+
+			cache = PageCache{buf.String(), time.Now().Add(time.Second * 10).UnixNano()}
+			M.pageCache[key] = cache
+		}
+		io.WriteString(w, cache.page)
 	} else {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 	}
