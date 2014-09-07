@@ -8,6 +8,7 @@ import (
 	"github.com/codegangsta/cli"
 	"github.com/elazarl/go-bindata-assetfs"
 	_ "github.com/mattn/go-sqlite3"
+	http_metrics "github.com/sonots/go-http_metrics"
 	"html/template"
 	"io"
 	"log"
@@ -206,14 +207,16 @@ func main() {
 func start(c *cli.Context) {
 	cpus := runtime.NumCPU()
 	runtime.GOMAXPROCS(cpus)
+	// http_metrics.Verbose = true
 
-	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(&assetfs.AssetFS{Asset, AssetDir, "/static/"})))
+	http.Handle("/static/", http_metrics.WrapHTTPHandler("foo", http.StripPrefix("/static/", http.FileServer(&assetfs.AssetFS{Asset, AssetDir, "/static/"}))))
 	// http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
-	http.HandleFunc("/", formHandler)
-	http.HandleFunc("/create", createHandler)
-	http.HandleFunc("/memos/", memoHandler)
+	http.HandleFunc("/", http_metrics.WrapHTTPHandlerFunc("formHandler", formHandler))
+	http.HandleFunc("/create", http_metrics.WrapHTTPHandlerFunc("createHandler", createHandler))
+	http.HandleFunc("/memos/", http_metrics.WrapHTTPHandlerFunc("memoHandler", memoHandler))
 	db = dbInit(c.String("database_url"))
 	address := c.String("host") + ":" + c.String("port")
 	fmt.Println("Start pastel at " + address)
+	http_metrics.Print()
 	http.ListenAndServe(address, nil)
 }
